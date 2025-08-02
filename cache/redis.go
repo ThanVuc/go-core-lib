@@ -18,9 +18,11 @@ func NewRedisCache(cfg Config) RedisCache {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	rdb := redis.NewClient(&redis.Options{
-		Addr:     cfg.Addr,
-		Password: cfg.Password,
-		DB:       cfg.DB,
+		Addr:         cfg.Addr,
+		Password:     cfg.Password,
+		DB:           cfg.DB,
+		PoolSize:     cfg.PoolSize,
+		MinIdleConns: cfg.MinIdle,
 	})
 
 	return &redisCache{
