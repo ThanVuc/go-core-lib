@@ -90,3 +90,7 @@ func (r *RedisCache) Close() error {
 	r.cancel()
 	return r.client.Close()
 }
+
+func (r *RedisCache) Ping() error {
+	return r.client.Ping(r.ctx).Err()
+}
