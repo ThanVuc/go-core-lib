@@ -8,13 +8,13 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-type redisCache struct {
+type RedisCache struct {
 	client *redis.Client
 	ctx    context.Context
 	cancel context.CancelFunc
 }
 
-func NewRedisCache(cfg Config) RedisCache {
+func NewRedisCache(cfg Config) *RedisCache {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	rdb := redis.NewClient(&redis.Options{
@@ -25,14 +25,14 @@ func NewRedisCache(cfg Config) RedisCache {
 		MinIdleConns: cfg.MinIdle,
 	})
 
-	return &redisCache{
+	return &RedisCache{
 		client: rdb,
 		ctx:    ctx,
 		cancel: cancel,
 	}
 }
 
-func Set[T any](r *redisCache, key string, value T, expiration time.Duration) error {
+func Set[T any](r *RedisCache, key string, value T, expiration time.Duration) error {
 	data, err := json.Marshal(value)
 	if err != nil {
 		return err
@@ -40,7 +40,7 @@ func Set[T any](r *redisCache, key string, value T, expiration time.Duration) er
 	return r.client.Set(r.ctx, key, data, expiration).Err()
 }
 
-func Get[T any](r *redisCache, key string) (T, error) {
+func Get[T any](r *RedisCache, key string) (T, error) {
 	var result T
 
 	data, err := r.client.Get(r.ctx, key).Result()
@@ -55,7 +55,7 @@ func Get[T any](r *redisCache, key string) (T, error) {
 	return result, nil
 }
 
-func GetAndSet[T any](r *redisCache, key string, value T, expiration time.Duration) (T, error) {
+func GetAndSet[T any](r *RedisCache, key string, value T, expiration time.Duration) (T, error) {
 	var result T
 
 	existing, err := Get[T](r, key)
@@ -74,7 +74,7 @@ func GetAndSet[T any](r *redisCache, key string, value T, expiration time.Durati
 	return value, nil
 }
 
-func Exists(r *redisCache, key string) (bool, error) {
+func Exists(r *RedisCache, key string) (bool, error) {
 	count, err := r.client.Exists(r.ctx, key).Result()
 	if err != nil {
 		return false, err
@@ -82,11 +82,11 @@ func Exists(r *redisCache, key string) (bool, error) {
 	return count > 0, nil
 }
 
-func Delete(r *redisCache, key string) error {
+func Delete(r *RedisCache, key string) error {
 	return r.client.Del(r.ctx, key).Err()
 }
 
-func (r *redisCache) Close() error {
+func (r *RedisCache) Close() error {
 	r.cancel()
 	return r.client.Close()
 }
