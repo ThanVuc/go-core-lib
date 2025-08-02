@@ -167,6 +167,8 @@ func main() {
         Addr:     "localhost:6379",
         Password: "",
         DB:       0,
+        PoolSize: 100,
+        MinIdle: 2
     })
     defer redisCache.Close()
 
