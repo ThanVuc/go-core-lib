@@ -3,6 +3,7 @@ package log
 import (
 	"os"
 	"runtime/debug"
+	"sync"
 
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
@@ -70,7 +71,9 @@ func (l *LoggerZap) Debug(message, requestID string, fields ...zap.Field) {
 	}, fields...)...)
 }
 
-func (l *LoggerZap) Sync() error {
+func (l *LoggerZap) Sync(wg *sync.WaitGroup) error {
+	wg.Add(1)
+	defer wg.Done()
 	return l.Logger.Sync()
 }
 

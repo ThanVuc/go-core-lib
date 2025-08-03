@@ -3,6 +3,7 @@ package cache
 import (
 	"context"
 	"encoding/json"
+	"sync"
 	"time"
 
 	"github.com/redis/go-redis/v9"
@@ -86,8 +87,10 @@ func Delete(r *RedisCache, key string) error {
 	return r.client.Del(r.ctx, key).Err()
 }
 
-func (r *RedisCache) Close() error {
+func (r *RedisCache) Close(wg *sync.WaitGroup) error {
+	wg.Add(1)
 	r.cancel()
+	defer wg.Done()
 	return r.client.Close()
 }
 
