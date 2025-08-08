@@ -88,7 +88,6 @@ func Delete(r *RedisCache, key string) error {
 }
 
 func (r *RedisCache) Close(wg *sync.WaitGroup) error {
-	wg.Add(1)
 	r.cancel()
 	defer wg.Done()
 	return r.client.Close()
