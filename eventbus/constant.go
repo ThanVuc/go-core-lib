@@ -11,11 +11,8 @@ const (
 )
 
 const (
-	CheckHealthExchange  ExchangeName = "check_health"
-	SyncDatabaseExchange ExchangeName = "sync_database"
-)
-
-const (
-	DLQCheckHealthExchange  DLQExchangeName = "dlq_check_health"
-	DLQSyncDatabaseExchange DLQExchangeName = "dlq_sync_database"
+	CheckHealthExchange     ExchangeName = "check_health"
+	SyncDatabaseExchange    ExchangeName = "sync_database"
+	DLQCheckHealthExchange  ExchangeName = "dlq_check_health"
+	DLQSyncDatabaseExchange ExchangeName = "dlq_sync_database"
 )

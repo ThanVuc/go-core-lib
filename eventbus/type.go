@@ -13,4 +13,3 @@ type TrackedMessage struct {
 }
 
 type ExchangeName string
-type DLQExchangeName string
