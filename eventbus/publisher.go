@@ -22,7 +22,7 @@ type publisher struct {
 	logger          log.Logger
 	maxRetries      int
 	retryDelay      int
-	dlqExchange     string
+	dlqExchange     DLQExchangeName
 	dlqRoutingKey   string
 }
 
@@ -104,7 +104,7 @@ func (p *publisher) SafetyPublish(ctx context.Context, request_id string, body [
 	dlqErr := p.sharedPublisher.Publish(
 		body,
 		[]string{p.dlqRoutingKey},
-		rabbitmq.WithPublishOptionsExchange(p.dlqExchange),
+		rabbitmq.WithPublishOptionsExchange(string(p.dlqExchange)),
 		rabbitmq.WithPublishOptionsHeaders(newHeaders),
 		rabbitmq.WithPublishOptionsContentType("application/json"),
 		rabbitmq.WithPublishOptionsPersistentDelivery,
@@ -121,12 +121,19 @@ func NewPublisher(
 	connector *RabbitMQConnector,
 	exchange ExchangeName,
 	routingKey []string,
-
+	maxRetries int,
+	retryDelay int,
+	dlqExchange DLQExchangeName,
+	dlqRoutingKey string,
 ) Publisher {
 	return &publisher{
 		sharedPublisher: connector.publisher,
 		exchange:        exchange,
 		routingKey:      routingKey,
 		logger:          connector.logger,
+		maxRetries:      maxRetries,
+		retryDelay:      retryDelay,
+		dlqExchange:     dlqExchange,
+		dlqRoutingKey:   dlqRoutingKey,
 	}
 }

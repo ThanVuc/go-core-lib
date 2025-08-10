@@ -10,8 +10,12 @@ const (
 	ExchangeTypeDefault ExchangeType = "default"
 )
 
-type ExchangeName string
+const (
+	CheckHealthExchange  ExchangeName = "check_health"
+	SyncDatabaseExchange ExchangeName = "sync_database"
+)
 
 const (
-	SyncDatabaseExchange ExchangeName = "sync_database"
+	DLQCheckHealthExchange  DLQExchangeName = "dlq_check_health"
+	DLQSyncDatabaseExchange DLQExchangeName = "dlq_sync_database"
 )
