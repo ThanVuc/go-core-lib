@@ -42,6 +42,12 @@ func NewConsumer(
 		rabbitmq.WithConsumerOptionsExchangeKind(string(exchangeType)),
 		rabbitmq.WithConsumerOptionsRoutingKey(routingKey),
 		rabbitmq.WithConsumerOptionsConcurrency(concurrency),
+		rabbitmq.WithConsumerOptionsBinding(rabbitmq.Binding{
+			RoutingKey: routingKey,
+			BindingOptions: rabbitmq.BindingOptions{
+				Declare: true,
+			},
+		}),
 		rabbitmq.WithConsumerOptionsExchangeDurable,
 		rabbitmq.WithConsumerOptionsQueueDurable,
 	)
