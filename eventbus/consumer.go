@@ -8,7 +8,9 @@ import (
 	"github.com/wagslane/go-rabbitmq"
 )
 
-type Consumer interface{}
+type Consumer interface {
+	Consume(ctx context.Context, handler rabbitmq.Handler) error
+}
 
 type consumer struct {
 	logger       log.Logger
