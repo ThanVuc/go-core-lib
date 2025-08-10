@@ -11,3 +11,6 @@ type TrackedMessage struct {
 	MaxRetries int                    `json:"max_retries"`
 	RetryDelay int                    `json:"retry_delay"`
 }
+
+type ExchangeName string
+type DLQExchangeName string
