@@ -50,6 +50,7 @@ func NewConsumer(
 		}),
 		rabbitmq.WithConsumerOptionsExchangeDurable,
 		rabbitmq.WithConsumerOptionsQueueDurable,
+		rabbitmq.WithConsumerOptionsExchangeDeclare,
 	)
 
 	if err != nil {
