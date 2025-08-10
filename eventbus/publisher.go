@@ -22,7 +22,7 @@ type publisher struct {
 	logger          log.Logger
 	maxRetries      *int
 	retryDelay      *int
-	dlqExchange     *DLQExchangeName
+	dlqExchange     *ExchangeName
 	dlqRoutingKey   *string
 }
 
@@ -123,7 +123,7 @@ func NewPublisher(
 	routingKey []string,
 	maxRetries *int,
 	retryDelay *int,
-	dlqExchange *DLQExchangeName,
+	dlqExchange *ExchangeName,
 	dlqRoutingKey *string,
 ) Publisher {
 	return &publisher{
