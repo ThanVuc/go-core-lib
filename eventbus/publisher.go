@@ -20,10 +20,10 @@ type publisher struct {
 	exchange        ExchangeName
 	routingKey      []string
 	logger          log.Logger
-	maxRetries      int
-	retryDelay      int
-	dlqExchange     DLQExchangeName
-	dlqRoutingKey   string
+	maxRetries      *int
+	retryDelay      *int
+	dlqExchange     *DLQExchangeName
+	dlqRoutingKey   *string
 }
 
 func (p *publisher) Publish(ctx context.Context, request_id string, body []byte, headers map[string]interface{}) error {
@@ -50,7 +50,7 @@ func (p *publisher) SafetyPublish(ctx context.Context, request_id string, body [
 		newHeaders[k] = v
 	}
 	newHeaders["request_id"] = request_id
-	for attempt := 0; attempt < p.maxRetries; attempt++ {
+	for attempt := 0; attempt < *p.maxRetries; attempt++ {
 		confirms, err := p.sharedPublisher.PublishWithDeferredConfirmWithContext(
 			ctx,
 			body,
@@ -64,16 +64,16 @@ func (p *publisher) SafetyPublish(ctx context.Context, request_id string, body [
 
 		if err != nil {
 			p.logger.Error("Failed to publish message", request_id, zap.Error(err))
-			if attempt < p.maxRetries-1 {
-				time.Sleep(time.Duration(p.retryDelay) * time.Millisecond)
+			if attempt < *p.maxRetries-1 {
+				time.Sleep(time.Duration(*p.retryDelay) * time.Millisecond)
 			}
 			continue
 		}
 
 		if len(confirms) == 0 || confirms[0] == nil {
 			p.logger.Error("No confirmation received for message", request_id)
-			if attempt < p.maxRetries-1 {
-				time.Sleep(time.Duration(p.retryDelay) * time.Millisecond)
+			if attempt < *p.maxRetries-1 {
+				time.Sleep(time.Duration(*p.retryDelay) * time.Millisecond)
 			}
 			continue
 		}
@@ -81,16 +81,16 @@ func (p *publisher) SafetyPublish(ctx context.Context, request_id string, body [
 		ok, waitErr := confirms[0].WaitContext(ctx)
 		if waitErr != nil {
 			p.logger.Error("Failed to wait for confirmation", request_id, zap.Error(waitErr))
-			if attempt < p.maxRetries-1 {
-				time.Sleep(time.Duration(p.retryDelay) * time.Millisecond)
+			if attempt < *p.maxRetries-1 {
+				time.Sleep(time.Duration(*p.retryDelay) * time.Millisecond)
 			}
 			continue
 		}
 
 		if !ok {
 			p.logger.Error("Message was not confirmed by RabbitMQ", request_id)
-			if attempt < p.maxRetries-1 {
-				time.Sleep(time.Duration(p.retryDelay) * time.Millisecond)
+			if attempt < *p.maxRetries-1 {
+				time.Sleep(time.Duration(*p.retryDelay) * time.Millisecond)
 			}
 			continue
 		}
@@ -103,8 +103,8 @@ func (p *publisher) SafetyPublish(ctx context.Context, request_id string, body [
 
 	dlqErr := p.sharedPublisher.Publish(
 		body,
-		[]string{p.dlqRoutingKey},
-		rabbitmq.WithPublishOptionsExchange(string(p.dlqExchange)),
+		[]string{*p.dlqRoutingKey},
+		rabbitmq.WithPublishOptionsExchange(string(*p.dlqExchange)),
 		rabbitmq.WithPublishOptionsHeaders(newHeaders),
 		rabbitmq.WithPublishOptionsContentType("application/json"),
 		rabbitmq.WithPublishOptionsPersistentDelivery,
@@ -121,10 +121,10 @@ func NewPublisher(
 	connector *RabbitMQConnector,
 	exchange ExchangeName,
 	routingKey []string,
-	maxRetries int,
-	retryDelay int,
-	dlqExchange DLQExchangeName,
-	dlqRoutingKey string,
+	maxRetries *int,
+	retryDelay *int,
+	dlqExchange *DLQExchangeName,
+	dlqRoutingKey *string,
 ) Publisher {
 	return &publisher{
 		sharedPublisher: connector.publisher,
