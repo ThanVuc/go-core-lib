@@ -72,7 +72,6 @@ func (l *LoggerZap) Debug(message, requestID string, fields ...zap.Field) {
 }
 
 func (l *LoggerZap) Sync(wg *sync.WaitGroup) error {
-	wg.Add(1)
 	defer wg.Done()
 	return l.Logger.Sync()
 }
