@@ -114,7 +114,6 @@ func (p *publisher) SafetyPublish(
 			continue
 		}
 
-		p.logger.Info("Message confirmed by RabbitMQ", request_id)
 		return nil
 	}
 
