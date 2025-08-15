@@ -12,9 +12,8 @@ import (
 
 type RabbitMQConnector struct {
 	conn      *rabbitmq.Conn
-	publisher *rabbitmq.Publisher
 	uri       string
-	consumer  []*rabbitmq.Consumer
+	consumers []*rabbitmq.Consumer
 	logger    log.Logger
 }
 
@@ -25,15 +24,6 @@ func NewConnector(uri string, logger log.Logger) (*RabbitMQConnector, error) {
 	)
 
 	if err != nil {
-		return nil, err
-	}
-
-	publisher, err := rabbitmq.NewPublisher(
-		conn,
-		rabbitmq.WithPublisherOptionsLogging,
-	)
-
-	if err != nil {
 		conn.Close()
 		return nil, err
 	}
@@ -41,22 +31,17 @@ func NewConnector(uri string, logger log.Logger) (*RabbitMQConnector, error) {
 	logger.Info("RabbitMQ connection established", "", zap.String("uri", uri))
 
 	return &RabbitMQConnector{
-		conn:      conn,
-		publisher: publisher,
-		uri:       uri,
-		logger:    logger,
+		conn:   conn,
+		uri:    uri,
+		logger: logger,
 	}, nil
 }
 
 func (r *RabbitMQConnector) Close(wg *sync.WaitGroup) {
 	defer wg.Done()
 
-	if r.publisher != nil {
-		r.publisher.Close()
-	}
-
 	var consumerWg sync.WaitGroup
-	for _, consumer := range r.consumer {
+	for _, consumer := range r.consumers {
 		if consumer != nil {
 			consumerWg.Add(1)
 			go func(c *rabbitmq.Consumer) {
@@ -67,8 +52,6 @@ func (r *RabbitMQConnector) Close(wg *sync.WaitGroup) {
 			}(consumer)
 		}
 	}
-
-	consumerWg.Wait()
 
 	if r.conn != nil {
 		r.conn.Close()

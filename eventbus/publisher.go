@@ -12,18 +12,23 @@ import (
 
 type Publisher interface {
 	Publish(ctx context.Context, request_id string, body []byte, headers map[string]interface{}) error
-	SafetyPublish(ctx context.Context, request_id string, body []byte, headers map[string]interface{}) error
+	SafetyPublish(
+		ctx context.Context,
+		request_id string,
+		body []byte,
+		headers map[string]interface{},
+		dlqExchange *ExchangeName,
+		dlqRoutingKey *string,
+	) error
 }
 
 type publisher struct {
-	sharedPublisher *rabbitmq.Publisher
-	exchange        ExchangeName
-	routingKey      []string
-	logger          log.Logger
-	maxRetries      *int
-	retryDelay      *int
-	dlqExchange     *ExchangeName
-	dlqRoutingKey   *string
+	publisher  *rabbitmq.Publisher
+	exchange   ExchangeName
+	routingKey []string
+	logger     log.Logger
+	maxRetries *int
+	retryDelay *int
 }
 
 func (p *publisher) Publish(ctx context.Context, request_id string, body []byte, headers map[string]interface{}) error {
@@ -33,7 +38,7 @@ func (p *publisher) Publish(ctx context.Context, request_id string, body []byte,
 	}
 	newHeaders["request_id"] = request_id
 
-	return p.sharedPublisher.PublishWithContext(
+	return p.publisher.PublishWithContext(
 		ctx,
 		body,
 		p.routingKey,
@@ -44,14 +49,21 @@ func (p *publisher) Publish(ctx context.Context, request_id string, body []byte,
 	)
 }
 
-func (p *publisher) SafetyPublish(ctx context.Context, request_id string, body []byte, headers map[string]interface{}) error {
+func (p *publisher) SafetyPublish(
+	ctx context.Context,
+	request_id string,
+	body []byte,
+	headers map[string]interface{},
+	dlqExchange *ExchangeName,
+	dlqRoutingKey *string,
+) error {
 	newHeaders := make(map[string]interface{})
 	for k, v := range headers {
 		newHeaders[k] = v
 	}
 	newHeaders["request_id"] = request_id
 	for attempt := 0; attempt < *p.maxRetries; attempt++ {
-		confirms, err := p.sharedPublisher.PublishWithDeferredConfirmWithContext(
+		confirms, err := p.publisher.PublishWithDeferredConfirmWithContext(
 			ctx,
 			body,
 			p.routingKey,
@@ -101,10 +113,10 @@ func (p *publisher) SafetyPublish(ctx context.Context, request_id string, body [
 
 	p.logger.Error("Failed to publish message after retries, sending to DLQ", request_id)
 
-	dlqErr := p.sharedPublisher.Publish(
+	dlqErr := p.publisher.Publish(
 		body,
-		[]string{*p.dlqRoutingKey},
-		rabbitmq.WithPublishOptionsExchange(string(*p.dlqExchange)),
+		[]string{*dlqRoutingKey},
+		rabbitmq.WithPublishOptionsExchange(string(*dlqExchange)),
 		rabbitmq.WithPublishOptionsHeaders(newHeaders),
 		rabbitmq.WithPublishOptionsContentType("application/json"),
 		rabbitmq.WithPublishOptionsPersistentDelivery,
@@ -120,20 +132,29 @@ func (p *publisher) SafetyPublish(ctx context.Context, request_id string, body [
 func NewPublisher(
 	connector *RabbitMQConnector,
 	exchange ExchangeName,
+	exchangeType ExchangeType,
 	routingKey []string,
 	maxRetries *int,
 	retryDelay *int,
-	dlqExchange *ExchangeName,
-	dlqRoutingKey *string,
 ) Publisher {
+	publisherInstance, err := rabbitmq.NewPublisher(
+		connector.conn,
+		rabbitmq.WithPublisherOptionsExchangeDeclare,
+		rabbitmq.WithPublisherOptionsExchangeName(string(exchange)),
+		rabbitmq.WithPublisherOptionsExchangeKind(string(exchangeType)),
+		rabbitmq.WithPublisherOptionsExchangeDurable,
+	)
+
+	if err != nil {
+		panic(fmt.Sprintf("Failed to create publisher: %v", err))
+	}
+
 	return &publisher{
-		sharedPublisher: connector.publisher,
-		exchange:        exchange,
-		routingKey:      routingKey,
-		logger:          connector.logger,
-		maxRetries:      maxRetries,
-		retryDelay:      retryDelay,
-		dlqExchange:     dlqExchange,
-		dlqRoutingKey:   dlqRoutingKey,
+		exchange:   exchange,
+		routingKey: routingKey,
+		logger:     connector.logger,
+		maxRetries: maxRetries,
+		retryDelay: retryDelay,
+		publisher:  publisherInstance,
 	}
 }
