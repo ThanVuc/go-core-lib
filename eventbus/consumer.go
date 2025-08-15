@@ -3,9 +3,11 @@ package eventbus
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/thanvuc/go-core-lib/log"
 	"github.com/wagslane/go-rabbitmq"
+	"go.uber.org/zap"
 )
 
 type Consumer interface {
@@ -53,6 +55,8 @@ func NewConsumer(
 		rabbitmq.WithConsumerOptionsExchangeDeclare,
 	)
 
+	connector.consumers = append(connector.consumers, ownConsumerInstance)
+
 	if err != nil {
 		panic(err)
 	}
@@ -76,4 +80,14 @@ func (c *consumer) Consume(ctx context.Context, handler rabbitmq.Handler) error 
 	}
 
 	return c.ownConsumer.Run(handler)
+}
+
+func (c *consumer) Close() {
+	if c.ownConsumer != nil {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		c.ownConsumer.CloseWithContext(shutdownCtx)
+	}
+
+	c.logger.Info("Consumer closed", "", zap.String("exchange", string(c.exchange)), zap.String("queue", c.queueName))
 }
