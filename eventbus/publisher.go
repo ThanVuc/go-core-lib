@@ -11,10 +11,17 @@ import (
 )
 
 type Publisher interface {
-	Publish(ctx context.Context, request_id string, body []byte, headers map[string]interface{}) error
+	Publish(
+		ctx context.Context,
+		request_id string,
+		routingKey []string,
+		body []byte,
+		headers map[string]interface{},
+	) error
 	SafetyPublish(
 		ctx context.Context,
 		request_id string,
+		routingKey []string,
 		body []byte,
 		headers map[string]interface{},
 		dlqExchange *ExchangeName,
@@ -25,13 +32,12 @@ type Publisher interface {
 type publisher struct {
 	publisher  *rabbitmq.Publisher
 	exchange   ExchangeName
-	routingKey []string
 	logger     log.Logger
 	maxRetries *int
 	retryDelay *int
 }
 
-func (p *publisher) Publish(ctx context.Context, request_id string, body []byte, headers map[string]interface{}) error {
+func (p *publisher) Publish(ctx context.Context, request_id string, routingKey []string, body []byte, headers map[string]interface{}) error {
 	newHeaders := make(map[string]interface{})
 	for k, v := range headers {
 		newHeaders[k] = v
@@ -41,7 +47,7 @@ func (p *publisher) Publish(ctx context.Context, request_id string, body []byte,
 	return p.publisher.PublishWithContext(
 		ctx,
 		body,
-		p.routingKey,
+		routingKey,
 		rabbitmq.WithPublishOptionsExchange(string(p.exchange)),
 		rabbitmq.WithPublishOptionsHeaders(newHeaders),
 		rabbitmq.WithPublishOptionsContentType("application/json"),
@@ -52,6 +58,7 @@ func (p *publisher) Publish(ctx context.Context, request_id string, body []byte,
 func (p *publisher) SafetyPublish(
 	ctx context.Context,
 	request_id string,
+	routingKey []string,
 	body []byte,
 	headers map[string]interface{},
 	dlqExchange *ExchangeName,
@@ -66,7 +73,7 @@ func (p *publisher) SafetyPublish(
 		confirms, err := p.publisher.PublishWithDeferredConfirmWithContext(
 			ctx,
 			body,
-			p.routingKey,
+			routingKey,
 			rabbitmq.WithPublishOptionsExchange(string(p.exchange)),
 			rabbitmq.WithPublishOptionsHeaders(newHeaders),
 			rabbitmq.WithPublishOptionsContentType("application/json"),
@@ -133,7 +140,6 @@ func NewPublisher(
 	connector *RabbitMQConnector,
 	exchange ExchangeName,
 	exchangeType ExchangeType,
-	routingKey []string,
 	maxRetries *int,
 	retryDelay *int,
 ) Publisher {
@@ -151,7 +157,6 @@ func NewPublisher(
 
 	return &publisher{
 		exchange:   exchange,
-		routingKey: routingKey,
 		logger:     connector.logger,
 		maxRetries: maxRetries,
 		retryDelay: retryDelay,
