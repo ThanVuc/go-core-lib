@@ -142,13 +142,22 @@ func NewPublisher(
 	exchangeType ExchangeType,
 	maxRetries *int,
 	retryDelay *int,
+	isConfirmedMode bool,
 ) Publisher {
-	publisherInstance, err := rabbitmq.NewPublisher(
-		connector.conn,
+	options := []func(*rabbitmq.PublisherOptions){
 		rabbitmq.WithPublisherOptionsExchangeDeclare,
 		rabbitmq.WithPublisherOptionsExchangeName(string(exchange)),
 		rabbitmq.WithPublisherOptionsExchangeKind(string(exchangeType)),
 		rabbitmq.WithPublisherOptionsExchangeDurable,
+	}
+
+	if isConfirmedMode {
+		options = append(options, rabbitmq.WithPublisherOptionsConfirm)
+	}
+
+	publisherInstance, err := rabbitmq.NewPublisher(
+		connector.conn,
+		options...,
 	)
 
 	if err != nil {
