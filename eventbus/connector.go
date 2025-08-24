@@ -7,7 +7,6 @@ import (
 
 	"github.com/thanvuc/go-core-lib/log"
 	"github.com/wagslane/go-rabbitmq"
-	"go.uber.org/zap"
 )
 
 type RabbitMQConnector struct {
@@ -57,5 +56,5 @@ func (r *RabbitMQConnector) Close(wg *sync.WaitGroup) {
 		r.conn.Close()
 	}
 
-	r.logger.Info("RabbitMQ connection, publisher, consumer closed", "", zap.String("uri", r.uri))
+	r.logger.Info("RabbitMQ connection, publisher, consumer closed", "")
 }
