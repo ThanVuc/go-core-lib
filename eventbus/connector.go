@@ -28,7 +28,7 @@ func NewConnector(uri string, logger log.Logger) (*RabbitMQConnector, error) {
 		return nil, err
 	}
 
-	logger.Info("RabbitMQ connection established", "", zap.String("uri", uri))
+	logger.Info("RabbitMQ connection established", "")
 
 	return &RabbitMQConnector{
 		conn:   conn,
