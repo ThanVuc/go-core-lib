@@ -10,9 +10,9 @@ import (
 )
 
 type RedisCache struct {
-	client *redis.Client
-	ctx    context.Context
-	cancel context.CancelFunc
+	Client *redis.Client
+	Ctx    context.Context
+	Cancel context.CancelFunc
 }
 
 func NewRedisCache(cfg Config) *RedisCache {
@@ -27,9 +27,9 @@ func NewRedisCache(cfg Config) *RedisCache {
 	})
 
 	return &RedisCache{
-		client: rdb,
-		ctx:    ctx,
-		cancel: cancel,
+		Client: rdb,
+		Ctx:    ctx,
+		Cancel: cancel,
 	}
 }
 
@@ -38,13 +38,13 @@ func Set[T any](r *RedisCache, key string, value T, expiration time.Duration) er
 	if err != nil {
 		return err
 	}
-	return r.client.Set(r.ctx, key, data, expiration).Err()
+	return r.Client.Set(r.Ctx, key, data, expiration).Err()
 }
 
 func Get[T any](r *RedisCache, key string) (T, error) {
 	var result T
 
-	data, err := r.client.Get(r.ctx, key).Result()
+	data, err := r.Client.Get(r.Ctx, key).Result()
 	if err != nil {
 		return result, err
 	}
@@ -76,7 +76,7 @@ func GetAndSet[T any](r *RedisCache, key string, value T, expiration time.Durati
 }
 
 func Exists(r *RedisCache, key string) (bool, error) {
-	count, err := r.client.Exists(r.ctx, key).Result()
+	count, err := r.Client.Exists(r.Ctx, key).Result()
 	if err != nil {
 		return false, err
 	}
@@ -84,15 +84,15 @@ func Exists(r *RedisCache, key string) (bool, error) {
 }
 
 func Delete(r *RedisCache, key string) error {
-	return r.client.Del(r.ctx, key).Err()
+	return r.Client.Del(r.Ctx, key).Err()
 }
 
 func (r *RedisCache) Close(wg *sync.WaitGroup) error {
-	r.cancel()
+	r.Cancel()
 	defer wg.Done()
-	return r.client.Close()
+	return r.Client.Close()
 }
 
 func (r *RedisCache) Ping() error {
-	return r.client.Ping(r.ctx).Err()
+	return r.Client.Ping(r.Ctx).Err()
 }
