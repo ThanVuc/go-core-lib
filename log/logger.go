@@ -50,18 +50,9 @@ func (l *LoggerZap) Warn(message, requestID string, fields ...zap.Field) {
 }
 
 func (l *LoggerZap) Error(message, requestID string, fields ...zap.Field) {
-	if l.env == "dev" {
-		sugar := l.Logger.Sugar()
-		sugar.Errorf("Error: %s, RequestID: %s, Fields: %+v\nStack Trace:\n%s",
-			message, requestID, fields, string(debug.Stack()))
-		return
-	}
-
-	l.Logger.Error(message, append([]zap.Field{
-		zap.String("request_id", requestID),
-		zap.String("env", l.env),
-		zap.Stack("stack_trace"),
-	}, fields...)...)
+	sugar := l.Logger.Sugar()
+	sugar.Errorf("Error: %s, RequestID: %s, Fields: %+v\nStack Trace:\n%s",
+		message, requestID, fields, string(debug.Stack()))
 }
 
 func (l *LoggerZap) Debug(message, requestID string, fields ...zap.Field) {
