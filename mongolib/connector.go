@@ -31,6 +31,7 @@ func NewMongoConnector(ctx context.Context, cfg MongoConnectorConfig) (*MongoCon
 		Password:   cfg.Password,
 		AuthSource: cfg.Database,
 	}
+	println("AuthSource:", cfg.Database)
 	// Set the configuration options
 	configureConnector(cfg, clientOptions)
 
