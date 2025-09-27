@@ -27,8 +27,9 @@ func NewMongoConnector(ctx context.Context, cfg MongoConnectorConfig) (*MongoCon
 
 	clientOptions := options.Client().ApplyURI(cfg.URI)
 	clientOptions.Auth = &options.Credential{
-		Username: cfg.Username,
-		Password: cfg.Password,
+		Username:   cfg.Username,
+		Password:   cfg.Password,
+		AuthSource: cfg.Database,
 	}
 	// Set the configuration options
 	configureConnector(cfg, clientOptions)
