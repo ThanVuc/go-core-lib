@@ -36,7 +36,7 @@ func (c *MongoConnector) CreateCollection(ctx context.Context, name string, vali
 func (c *MongoConnector) updateValidator(ctx context.Context, name string, validator bson.M) error {
 	cmd := bson.D{
 		{Key: "collMod", Value: name},
-		{Key: "validator", Value: bson.M{"$jsonSchema": validator}},
+		{Key: "validator", Value: validator},
 	}
 	return c.Database.RunCommand(ctx, cmd).Err()
 }
