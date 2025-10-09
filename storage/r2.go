@@ -94,3 +94,26 @@ func (c *Client) Delete(ctx context.Context, key string) error {
 	return c.mc.RemoveObject(ctx, c.cfg.Bucket, key, minio.RemoveObjectOptions{})
 }
 
+
+func (c *Client) DeleteMany(ctx context.Context, keys []string) error {
+	if len(keys) == 0 {
+		return nil
+	}
+
+	objCh := make(chan minio.ObjectInfo, len(keys))
+	for _, k := range keys {
+		objCh <- minio.ObjectInfo{Key: k}
+	}
+	close(objCh)
+
+	errs := c.mc.RemoveObjects(ctx, c.cfg.Bucket, objCh, minio.RemoveObjectsOptions{})
+
+	var failed []string
+	for e := range errs {
+		failed = append(failed, fmt.Sprintf("%s: %v", e.ObjectName, e.Err))
+	}
+	if len(failed) > 0 {
+		return fmt.Errorf("delete many failed: %v", strings.Join(failed, "; "))
+	}
+	return nil
+}
