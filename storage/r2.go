@@ -20,7 +20,6 @@ type Client struct {
 
 func NewClient(cfg Config) (*Client, error) {
 	endpoint := strings.TrimPrefix(cfg.Endpoint, "https://")
-	endpoint = strings.TrimPrefix(endpoint, "http://")
 
 	mc, err := minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, ""),
@@ -83,34 +82,12 @@ func (c *Client) UploadImage(ctx context.Context, src io.Reader, opts UploadOpti
 	}, nil
 }
 
-func (c *Client) Delete(ctx context.Context, key string) error {
-	return c.mc.RemoveObject(ctx, c.cfg.Bucket, key, minio.RemoveObjectOptions{})
-}
-
 func (c *Client) PublicURL(key string) string {
-	return fmt.Sprintf("https://%s.r2.cloudflarestorage.com/%s/%s", c.cfg.AccountID, c.cfg.Bucket, key)
+	if c.cfg.PublicURL != "" {
+		return fmt.Sprintf("%s/%s", strings.TrimSuffix(c.cfg.PublicURL, "/"), key)
+	}
+	return fmt.Sprintf("https://%s.r2.cloudflarestorage.com/%s/%s",
+		c.cfg.AccountID, c.cfg.Bucket, key)
 }
 
-func (c *Client) DeleteMany(ctx context.Context, keys []string) error {
-	if len(keys) == 0 {
-		return nil
-	}
 
-	objCh := make(chan minio.ObjectInfo, len(keys))
-	for _, k := range keys {
-		objCh <- minio.ObjectInfo{Key: k}
-	}
-	close(objCh)
-
-	errs := c.mc.RemoveObjects(ctx, c.cfg.Bucket, objCh, minio.RemoveObjectsOptions{})
-
-	// gom lỗi trả về
-	var failed []string
-	for e := range errs {
-		failed = append(failed, fmt.Sprintf("%s: %v", e.ObjectName, e.Err))
-	}
-	if len(failed) > 0 {
-		return fmt.Errorf("delete many failed: %v", strings.Join(failed, "; "))
-	}
-	return nil
-}
