@@ -90,4 +90,7 @@ func (c *Client) PublicURL(key string) string {
 		c.cfg.AccountID, c.cfg.Bucket, key)
 }
 
+func (c *Client) Delete(ctx context.Context, key string) error {
+	return c.mc.RemoveObject(ctx, c.cfg.Bucket, key, minio.RemoveObjectOptions{})
+}
 
