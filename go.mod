@@ -3,9 +3,10 @@ module github.com/thanvuc/go-core-lib
 go 1.24.3
 
 require (
-	github.com/disintegration/imaging v1.6.2
+	github.com/HugoSmits86/nativewebp v1.2.0
 	github.com/google/uuid v1.6.0
 	github.com/minio/minio-go/v7 v7.0.18
+	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
 	github.com/redis/go-redis/v9 v9.11.0
 	github.com/spf13/viper v1.20.1
 	github.com/wagslane/go-rabbitmq v0.15.0
@@ -44,7 +45,7 @@ require (
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
 	go.uber.org/multierr v1.10.0 // indirect
 	golang.org/x/crypto v0.33.0 // indirect
-	golang.org/x/image v0.0.0-20191009234506-e7c1f5e7dbb8 // indirect
+	golang.org/x/image v0.24.0 // indirect
 	golang.org/x/net v0.33.0 // indirect
 	golang.org/x/sync v0.11.0 // indirect
 	golang.org/x/sys v0.30.0 // indirect

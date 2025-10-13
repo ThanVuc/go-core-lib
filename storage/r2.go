@@ -2,10 +2,9 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"io"
-	"mime"
-	"path/filepath"
+	"mime/multipart"
 	"strings"
 
 	"github.com/google/uuid"
@@ -13,31 +12,35 @@ import (
 	"github.com/minio/minio-go/v7/pkg/credentials"
 )
 
-type Client struct {
+type R2Client struct {
 	mc  *minio.Client
 	cfg Config
 }
 
-func NewClient(cfg Config) (*Client, error) {
+func (c *R2Client) Config() {
+	panic("unimplemented")
+}
+
+func NewClient(cfg Config) (*R2Client, error) {
 	endpoint := strings.TrimPrefix(cfg.Endpoint, "https://")
+	endpoint = strings.TrimPrefix(endpoint, "http://")
 
 	mc, err := minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, ""),
 		Secure: cfg.UseSSL,
-		Region: "",
 	})
 	if err != nil {
 		return nil, err
 	}
-	return &Client{mc: mc, cfg: cfg}, nil
+	return &R2Client{mc: mc, cfg: cfg}, nil
 }
 
 type UploadOptions struct {
 	KeyPrefix    string
-	Filename     string
 	ResizeWidth  int
 	ResizeHeight int
 	Quality      int
+	MaxSizeMB    int
 }
 
 type UploadResult struct {
@@ -46,27 +49,24 @@ type UploadResult struct {
 	Size int64
 }
 
-func (c *Client) UploadImage(ctx context.Context, src io.Reader, opts UploadOptions) (*UploadResult, error) {
+func (c *R2Client) UploadImage(ctx context.Context, file *multipart.FileHeader, opts UploadOptions) (*UploadResult, error) {
+	if opts.MaxSizeMB >0 && file.Size > int64(opts.MaxSizeMB)*1024*1024 {
+		return nil, fmt.Errorf("file vượt quá giới hạn %dMB", opts.MaxSizeMB)
+	}
+
+	src, err := file.Open()
+	if err != nil {
+		return nil, err
+	}
+	defer src.Close()
+
 	rs, size, contentType, err := processImage(src, opts)
 	if err != nil {
 		return nil, err
 	}
 
-	ext := filepath.Ext(opts.Filename)
-	if ext == "" {
-		if exts, _ := mime.ExtensionsByType(contentType); len(exts) > 0 {
-			ext = exts[0]
-		} else {
-			ext = ".jpg"
-		}
-	}
-
-	var key string
-	if opts.KeyPrefix != "" {
-		key = fmt.Sprintf("%s/%s%s", strings.TrimSuffix(opts.KeyPrefix, "/"), uuid.NewString(), ext)
-	} else {
-		key = fmt.Sprintf("%s%s", uuid.NewString(), ext)
-	}
+	ext := ".webp"
+	key := fmt.Sprintf("%s/%s%s", strings.TrimSuffix(opts.KeyPrefix, "/"), uuid.NewString(), ext)
 
 	info, err := c.mc.PutObject(ctx, c.cfg.Bucket, key, rs, size, minio.PutObjectOptions{
 		ContentType: contentType,
@@ -75,27 +75,41 @@ func (c *Client) UploadImage(ctx context.Context, src io.Reader, opts UploadOpti
 		return nil, err
 	}
 
+	url, err := c.GetPublicURL(key)
+	if err != nil {
+		return nil, err
+	}
+
 	return &UploadResult{
 		Key:  key,
-		URL:  c.PublicURL(key),
+		URL:  url,
 		Size: info.Size,
 	}, nil
 }
 
-func (c *Client) PublicURL(key string) string {
-	if c.cfg.PublicURL != "" {
-		return fmt.Sprintf("%s/%s", strings.TrimSuffix(c.cfg.PublicURL, "/"), key)
+func (c *R2Client) GetPublicURL(key string) (string, error) {
+	if c.cfg.PublicURL == "" {
+		return "", errors.New("public URL is not configured")
 	}
-	return fmt.Sprintf("https://%s.r2.cloudflarestorage.com/%s/%s",
-		c.cfg.AccountID, c.cfg.Bucket, key)
+	return fmt.Sprintf("%s/%s", strings.TrimSuffix(c.cfg.PublicURL, "/"), key), nil
 }
 
-func (c *Client) Delete(ctx context.Context, key string) error {
+func (c *R2Client) ParseURLToKey(url string) (string, error) {
+	if c.cfg.PublicURL == "" {
+		return "", errors.New("public URL is not configured, cannot parse")
+	}
+	base := strings.TrimSuffix(c.cfg.PublicURL, "/") + "/"
+	if !strings.HasPrefix(url, base) {
+		return "", fmt.Errorf("invalid URL prefix: %s", url)
+	}
+	return strings.TrimPrefix(url, base), nil
+}
+
+func (c *R2Client) Delete(ctx context.Context, key string) error {
 	return c.mc.RemoveObject(ctx, c.cfg.Bucket, key, minio.RemoveObjectOptions{})
 }
 
-
-func (c *Client) DeleteMany(ctx context.Context, keys []string) error {
+func (c *R2Client) DeleteMany(ctx context.Context, keys []string) error {
 	if len(keys) == 0 {
 		return nil
 	}
@@ -107,7 +121,6 @@ func (c *Client) DeleteMany(ctx context.Context, keys []string) error {
 	close(objCh)
 
 	errs := c.mc.RemoveObjects(ctx, c.cfg.Bucket, objCh, minio.RemoveObjectsOptions{})
-
 	var failed []string
 	for e := range errs {
 		failed = append(failed, fmt.Sprintf("%s: %v", e.ObjectName, e.Err))
