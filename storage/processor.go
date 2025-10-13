@@ -15,21 +15,21 @@ import (
 func processImage(r io.Reader, opts UploadOptions) (io.ReadSeeker, int64, string, error) {
 	img, _, err := image.Decode(r)
 	if err != nil {
-		return nil, 0, "", fmt.Errorf("decode ảnh lỗi: %v", err)
+		return nil, 0, "", fmt.Errorf("error decode : %v", err)
 	}
 
-	// Resize nếu cần
+	// Resize 
 	if opts.ResizeWidth > 0 || opts.ResizeHeight > 0 {
 		w := uint(opts.ResizeWidth)
 		h := uint(opts.ResizeHeight)
 		img = resize.Resize(w, h, img, resize.Lanczos3)
 	}
 
-	// Encode sang WebP
+	// Encode into WebP
 	buf := &bytes.Buffer{}
 	err = nativewebp.Encode(buf, img, nil)
 	if err != nil {
-		return nil, 0, "", fmt.Errorf("encode webp lỗi: %v", err)
+		return nil, 0, "", fmt.Errorf("error encode webp : %v", err)
 	}
 
 	data := buf.Bytes()

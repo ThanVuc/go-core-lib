@@ -17,10 +17,7 @@ type R2Client struct {
 	cfg Config
 }
 
-func (c *R2Client) Config() {
-	panic("unimplemented")
-}
-
+// Create a configuration struct for R2Client
 func NewClient(cfg Config) (*R2Client, error) {
 	endpoint := strings.TrimPrefix(cfg.Endpoint, "https://")
 	endpoint = strings.TrimPrefix(endpoint, "http://")
@@ -35,23 +32,10 @@ func NewClient(cfg Config) (*R2Client, error) {
 	return &R2Client{mc: mc, cfg: cfg}, nil
 }
 
-type UploadOptions struct {
-	KeyPrefix    string
-	ResizeWidth  int
-	ResizeHeight int
-	Quality      int
-	MaxSizeMB    int
-}
-
-type UploadResult struct {
-	Key  string
-	URL  string
-	Size int64
-}
-
-func (c *R2Client) UploadImage(ctx context.Context, file *multipart.FileHeader, opts UploadOptions) (*UploadResult, error) {
-	if opts.MaxSizeMB >0 && file.Size > int64(opts.MaxSizeMB)*1024*1024 {
-		return nil, fmt.Errorf("file vượt quá giới hạn %dMB", opts.MaxSizeMB)
+// If uploading the image with the existing key, it may overwrite the existing file.(Update)
+func (c *R2Client) UploadImage(ctx context.Context, file *multipart.FileHeader, opts UploadOptions) (*string, error) {
+	if opts.MaxSizeMB > 0 && file.Size > int64(opts.MaxSizeMB)*1024*1024 {
+		return nil, fmt.Errorf("limited: %dMB", opts.MaxSizeMB)
 	}
 
 	src, err := file.Open()
@@ -65,10 +49,18 @@ func (c *R2Client) UploadImage(ctx context.Context, file *multipart.FileHeader, 
 		return nil, err
 	}
 
-	ext := ".webp"
-	key := fmt.Sprintf("%s/%s%s", strings.TrimSuffix(opts.KeyPrefix, "/"), uuid.NewString(), ext)
+	var key string
+	if opts.Url != nil {
+		key, err = c.ParseURLToKey(*opts.Url)
+		if err != nil {
+			return nil, err
+		}
+	} else {
+		ext := ".webp"
+		key = fmt.Sprintf("%s/%s%s", strings.TrimSuffix(opts.KeyPrefix, "/"), uuid.NewString(), ext)
+	}
 
-	info, err := c.mc.PutObject(ctx, c.cfg.Bucket, key, rs, size, minio.PutObjectOptions{
+	_, err = c.mc.PutObject(ctx, c.cfg.Bucket, key, rs, size, minio.PutObjectOptions{
 		ContentType: contentType,
 	})
 	if err != nil {
@@ -80,11 +72,7 @@ func (c *R2Client) UploadImage(ctx context.Context, file *multipart.FileHeader, 
 		return nil, err
 	}
 
-	return &UploadResult{
-		Key:  key,
-		URL:  url,
-		Size: info.Size,
-	}, nil
+	return &url, nil
 }
 
 func (c *R2Client) GetPublicURL(key string) (string, error) {
@@ -102,7 +90,11 @@ func (c *R2Client) ParseURLToKey(url string) (string, error) {
 	if !strings.HasPrefix(url, base) {
 		return "", fmt.Errorf("invalid URL prefix: %s", url)
 	}
-	return strings.TrimPrefix(url, base), nil
+	uuidString := strings.TrimPrefix(url, base)
+	if uuid, err := uuid.Parse(uuidString); err != nil || uuid.String() != uuidString {
+		return "", fmt.Errorf("invalid URL format: %s", url)
+	}
+	return uuidString, nil
 }
 
 func (c *R2Client) Delete(ctx context.Context, key string) error {
