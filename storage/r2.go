@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"mime/multipart"
+	"mime"
+	"net/url"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
@@ -32,47 +34,31 @@ func NewClient(cfg Config) (*R2Client, error) {
 	return &R2Client{mc: mc, cfg: cfg}, nil
 }
 
-// If uploading the image with the existing key, it may overwrite the existing file.(Update)
-func (c *R2Client) UploadImage(ctx context.Context, file *multipart.FileHeader, opts UploadOptions) (*string, error) {
-	if opts.MaxSizeMB > 0 && file.Size > int64(opts.MaxSizeMB)*1024*1024 {
-		return nil, fmt.Errorf("limited: %dMB", opts.MaxSizeMB)
+func (c *R2Client) GeneratePresignedUploadURL(ctx context.Context, keyPrefix string, contentType string, expiry time.Duration) (*GeneratedURLResponse, error) {
+	exts, err := mime.ExtensionsByType(contentType)
+	if err != nil || len(exts) == 0 {
+		return nil, fmt.Errorf("invalid or unknown content type: %s", contentType)
 	}
+	ext := exts[0]
+	key := fmt.Sprintf("%s/%s%s", strings.TrimSuffix(keyPrefix, "/"), uuid.NewString(), ext)
+	reqParams := make(url.Values)
+	reqParams.Set("Content-Type", contentType)
 
-	src, err := file.Open()
+	presignedURL, err := c.mc.Presign(ctx, "PUT", c.cfg.Bucket, key, expiry, reqParams)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to generate presigned URL: %w", err)
 	}
-	defer src.Close()
 
-	rs, size, contentType, err := processImage(src, opts)
+	publicURL, err := c.GetPublicURL(key)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get public URL: %w", err)
 	}
 
-	var key string
-	if opts.Url != nil {
-		key, err = c.ParseURLToKey(*opts.Url)
-		if err != nil {
-			return nil, err
-		}
-	} else {
-		ext := ".webp"
-		key = fmt.Sprintf("%s/%s%s", strings.TrimSuffix(opts.KeyPrefix, "/"), uuid.NewString(), ext)
-	}
-
-	_, err = c.mc.PutObject(ctx, c.cfg.Bucket, key, rs, size, minio.PutObjectOptions{
-		ContentType: contentType,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	url, err := c.GetPublicURL(key)
-	if err != nil {
-		return nil, err
-	}
-
-	return &url, nil
+	return &GeneratedURLResponse{
+		PresignedURL: presignedURL.String(),
+		PublicURL:    publicURL,
+		ObjectKey:    key,
+	}, nil
 }
 
 func (c *R2Client) GetPublicURL(key string) (string, error) {
