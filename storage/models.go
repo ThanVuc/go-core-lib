@@ -11,9 +11,12 @@ type Config struct {
 }
 
 type UploadOptions struct {
-	KeyPrefix    string
-	ResizeWidth  int
-	ResizeHeight int
-	MaxSizeMB    int
-	Url          *string
+	KeyPrefix string
+	Url       *string
+}
+
+type GeneratedURLResponse struct {
+	PresignedURL string `json:"presigned_url"`
+	PublicURL    string `json:"public_url"`
+	ObjectKey    string `json:"object_key"`
 }
