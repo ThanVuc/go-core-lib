@@ -15,7 +15,7 @@ import (
 func processImage(r io.Reader, opts UploadOptions) (io.ReadSeeker, int64, string, error) {
 	img, _, err := image.Decode(r)
 	if err != nil {
-		return nil, 0, "", fmt.Errorf("error decode : %v", err)
+		return nil, 0,"", fmt.Errorf("error decode : %v", err)
 	}
 
 	// Resize 

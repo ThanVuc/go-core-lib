@@ -34,14 +34,21 @@ func NewClient(cfg Config) (*R2Client, error) {
 	return &R2Client{mc: mc, cfg: cfg}, nil
 }
 
-// Generate a presigned URL for uploading a new object.
-func (c *R2Client) GeneratePresignedUploadURL(ctx context.Context, otps PresignOptions) (*GeneratedURLResponse, error) {
-	ext, err := mime.ExtensionsByType(otps.ContentType)
-	if err != nil || len(ext) == 0 {
+// Generate a presigned URL for uploading or updating a new object.
+func (c *R2Client) GeneratePresignedURL(ctx context.Context, otps PresignOptions) (*GeneratedURLResponse, error) {
+	exts, err := mime.ExtensionsByType(otps.ContentType)
+	if err != nil || len(exts) == 0 {
 		return nil, fmt.Errorf("invalid or unknown content type: %s", otps.ContentType)
 	}
+	ext := exts[0]
 
-	key := fmt.Sprintf("%s/%s%s", strings.TrimSuffix(otps.KeyPrefix, "/"), uuid.NewString(), ext)
+	var key string
+	if otps.ObjectKey != "" {
+		key = otps.ObjectKey
+	} else {
+		key = fmt.Sprintf("%s/%s%s", strings.TrimSuffix(otps.KeyPrefix, "/"), uuid.NewString(), ext)
+	}
+
 	reqParams := make(url.Values)
 	reqParams.Set("Content-Type", otps.ContentType)
 
@@ -60,19 +67,6 @@ func (c *R2Client) GeneratePresignedUploadURL(ctx context.Context, otps PresignO
 		PublicURL:    publicURL,
 		ObjectKey:    key,
 	}, nil
-}
-
-// Generate a presigned URL for updating an existing object.
-func (c *R2Client) GeneratePresignedURLForUpdate(ctx context.Context, objectKey string, otps PresignOptions) (string, error) {
-	reqParams := make(url.Values)
-	reqParams.Set("Content-Type", otps.ContentType)
-
-	presignedURL, err := c.mc.Presign(ctx, "PUT", c.cfg.Bucket, objectKey, otps.Expiry, reqParams)
-	if err != nil {
-		return "", fmt.Errorf("failed to generate update URL: %w", err)
-	}
-
-	return presignedURL.String(), nil
 }
 
 // If uploading the image with the existing key, it may overwrite the existing file.(Update)
