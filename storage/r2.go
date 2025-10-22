@@ -43,8 +43,8 @@ func (c *R2Client) GeneratePresignedURL(ctx context.Context, otps PresignOptions
 	ext := exts[0]
 
 	var key string
-	if otps.ObjectKey != "" {
-		key = otps.ObjectKey
+	if otps.ObjectKey != nil {
+		key = *otps.ObjectKey
 	} else {
 		key = fmt.Sprintf("%s/%s%s", strings.TrimSuffix(otps.KeyPrefix, "/"), uuid.NewString(), ext)
 	}

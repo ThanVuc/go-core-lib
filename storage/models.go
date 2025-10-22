@@ -24,7 +24,7 @@ type PresignOptions struct {
 	KeyPrefix   string
 	ContentType string
 	Expiry      time.Duration
-	ObjectKey   string
+	ObjectKey   *string
 }
 
 type GeneratedURLResponse struct {
