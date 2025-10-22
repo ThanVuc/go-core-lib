@@ -1,5 +1,7 @@
 package storage
 
+import "time"
+
 type Config struct {
 	AccountID string
 	Endpoint  string
@@ -11,8 +13,18 @@ type Config struct {
 }
 
 type UploadOptions struct {
-	KeyPrefix string
-	Url       *string
+	KeyPrefix    string
+	ResizeWidth  int
+	ResizeHeight int
+	MaxSizeMB    int
+	Url          *string
+}
+
+type PresignOptions struct {
+	KeyPrefix   string
+	ContentType string
+	Expiry      time.Duration
+	ObjectKey   *string
 }
 
 type GeneratedURLResponse struct {
