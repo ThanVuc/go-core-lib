@@ -96,3 +96,31 @@ func (r *RedisCache) Close(wg *sync.WaitGroup) error {
 func (r *RedisCache) Ping() error {
 	return r.Client.Ping(r.Ctx).Err()
 }
+
+func SetNX[T any](r *RedisCache, key string, value T, expiration time.Duration) (bool, error) {
+	data, err := json.Marshal(value)
+	if err != nil {
+		return false, err
+	}
+	ok, err := r.Client.SetNX(r.Ctx, key, data, expiration).Result()
+	if err != nil {
+		return false, err
+	}
+	return ok, nil
+}
+
+func Expire(r *RedisCache, key string, expiration time.Duration) (bool, error) {
+	ok, err := r.Client.Expire(r.Ctx, key, expiration).Result()
+	if err != nil {
+		return false, err
+	}
+	return ok, nil
+}
+
+func RenewTTL(r *RedisCache, key string, expiration time.Duration) (bool, error) {
+	ok, err := r.Client.Expire(r.Ctx, key, expiration).Result()
+	if err != nil {
+		return false, err
+	}
+	return ok, nil
+}
