@@ -11,7 +11,7 @@ import (
 // CronScheduler defines the interface for a single scheduler
 // Only supports job > 2 minutes interval
 type CronScheduler interface {
-	ScheduleCronJob(schedule string, jobFunc func()) (cron.EntryID, error)
+	ScheduleCronJob(schedule string, jobFunc func()) error
 	Start()
 	Stop()
 }
@@ -28,7 +28,7 @@ func NewCronScheduler(
 	redisClient *cache.RedisCache,
 	cronName string,
 	cronOpts ...cron.Option,
-) *cronScheduler {
+) CronScheduler {
 	lockKey := "cronjob-lock-" + cronName
 	return &cronScheduler{
 		lockKey:     lockKey,
