@@ -18,6 +18,7 @@ type Publisher interface {
 		body []byte,
 		headers map[string]interface{},
 	) error
+
 	SafetyPublish(
 		ctx context.Context,
 		request_id string,
