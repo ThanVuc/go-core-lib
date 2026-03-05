@@ -27,11 +27,10 @@ func WithFields(fields ...zap.Field) LogOption {
 }
 
 type LoggerZapV2 struct {
-	*zap.Logger
-	env string
+	logger *zap.Logger
 }
 
-func NewLoggerZapV2(env string) (*LoggerZapV2, error) {
+func NewLoggerZapV2(env string) (LoggerV2, error) {
 	var cfg zap.Config
 
 	if env == "production" {
@@ -43,14 +42,16 @@ func NewLoggerZapV2(env string) (*LoggerZapV2, error) {
 	cfg.EncoderConfig.TimeKey = "timestamp"
 	cfg.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
 
-	logger, err := cfg.Build()
+	baseLogger, err := cfg.Build()
 	if err != nil {
 		return nil, err
 	}
 
+	// inject env once here
+	logger := baseLogger.With(zap.String("env", env))
+
 	return &LoggerZapV2{
-		Logger: logger,
-		env:    env,
+		logger: logger,
 	}, nil
 }
 
@@ -61,9 +62,7 @@ func (l *LoggerZapV2) buildFields(opts ...LogOption) []zap.Field {
 		opt(options)
 	}
 
-	fields := []zap.Field{
-		zap.String("env", l.env),
-	}
+	fields := make([]zap.Field, 0, len(options.fields)+1)
 
 	if options.requestID != "" {
 		fields = append(fields, zap.String("request_id", options.requestID))
@@ -75,15 +74,15 @@ func (l *LoggerZapV2) buildFields(opts ...LogOption) []zap.Field {
 }
 
 func (l *LoggerZapV2) Info(message string, opts ...LogOption) {
-	l.Logger.Info(message, l.buildFields(opts...)...)
+	l.logger.Info(message, l.buildFields(opts...)...)
 }
 
 func (l *LoggerZapV2) Debug(message string, opts ...LogOption) {
-	l.Logger.Debug(message, l.buildFields(opts...)...)
+	l.logger.Debug(message, l.buildFields(opts...)...)
 }
 
 func (l *LoggerZapV2) Warn(message string, opts ...LogOption) {
-	l.Logger.Warn(message, l.buildFields(opts...)...)
+	l.logger.Warn(message, l.buildFields(opts...)...)
 }
 
 func (l *LoggerZapV2) Error(message string, opts ...LogOption) {
@@ -92,5 +91,5 @@ func (l *LoggerZapV2) Error(message string, opts ...LogOption) {
 		zap.String("stack_trace", string(debug.Stack())),
 	)
 
-	l.Logger.Error(message, fields...)
+	l.logger.Error(message, fields...)
 }
