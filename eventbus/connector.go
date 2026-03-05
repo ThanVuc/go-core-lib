@@ -7,6 +7,7 @@ import (
 
 	"github.com/thanvuc/go-core-lib/log"
 	"github.com/wagslane/go-rabbitmq"
+	"golang.org/x/sync/errgroup"
 )
 
 type RabbitMQConnector struct {
@@ -57,4 +58,36 @@ func (r *RabbitMQConnector) Close(wg *sync.WaitGroup) {
 	}
 
 	r.logger.Info("RabbitMQ connection, publisher, consumer closed", "")
+}
+
+func (r *RabbitMQConnector) Shutdown(ctx context.Context) error {
+	g, ctx := errgroup.WithContext(ctx)
+
+	for _, consumer := range r.consumers {
+		if consumer == nil {
+			continue
+		}
+
+		c := consumer
+
+		g.Go(func() error {
+			shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+			defer cancel()
+
+			c.CloseWithContext(shutdownCtx)
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return err
+	}
+
+	if r.conn != nil {
+		r.conn.Close()
+	}
+
+	r.logger.Info("RabbitMQ connection, publisher, consumer closed", "")
+
+	return nil
 }
