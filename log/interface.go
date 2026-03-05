@@ -19,5 +19,4 @@ type LoggerV2 interface {
 	Error(message string, opts ...LogOption)
 	Debug(message string, opts ...LogOption)
 	Warn(message string, opts ...LogOption)
-	Sync(wg *sync.WaitGroup) error
 }
