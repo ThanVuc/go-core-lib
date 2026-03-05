@@ -4,6 +4,7 @@ import (
 	"runtime/debug"
 
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 )
 
 type LogOption func(*logOptions)
@@ -30,6 +31,29 @@ type LoggerZapV2 struct {
 	env string
 }
 
+func NewLoggerZapV2(env string) (*LoggerZapV2, error) {
+	var cfg zap.Config
+
+	if env == "production" {
+		cfg = zap.NewProductionConfig()
+	} else {
+		cfg = zap.NewDevelopmentConfig()
+	}
+
+	cfg.EncoderConfig.TimeKey = "timestamp"
+	cfg.EncoderConfig.EncodeTime = zapcore.ISO8601TimeEncoder
+
+	logger, err := cfg.Build()
+	if err != nil {
+		return nil, err
+	}
+
+	return &LoggerZapV2{
+		Logger: logger,
+		env:    env,
+	}, nil
+}
+
 func (l *LoggerZapV2) buildFields(opts ...LogOption) []zap.Field {
 	options := &logOptions{}
 
@@ -50,7 +74,7 @@ func (l *LoggerZapV2) buildFields(opts ...LogOption) []zap.Field {
 	return fields
 }
 
-func (l *LoggerZapV2) InfoV2(message string, opts ...LogOption) {
+func (l *LoggerZapV2) Info(message string, opts ...LogOption) {
 	l.Logger.Info(message, l.buildFields(opts...)...)
 }
 
