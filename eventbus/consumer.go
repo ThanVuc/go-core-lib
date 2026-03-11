@@ -3,6 +3,7 @@ package eventbus
 import (
 	"context"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/thanvuc/go-core-lib/log"
@@ -23,6 +24,8 @@ type consumer struct {
 	routingKey   string
 	queueName    string
 	concurrency  int
+
+	closeOnce sync.Once
 }
 
 func NewConsumer(
@@ -55,11 +58,11 @@ func NewConsumer(
 		rabbitmq.WithConsumerOptionsExchangeDeclare,
 	)
 
-	connector.consumers = append(connector.consumers, ownConsumerInstance)
-
 	if err != nil {
 		panic(err)
 	}
+
+	connector.consumers = append(connector.consumers, ownConsumerInstance)
 
 	return &consumer{
 		logger:       connector.logger,
@@ -79,15 +82,35 @@ func (c *consumer) Consume(ctx context.Context, handler rabbitmq.Handler) error 
 		return errors.New("handler or consumer is nil")
 	}
 
+	done := make(chan struct{})
+
+	go func() {
+		select {
+		case <-ctx.Done():
+			c.logger.Info("Context cancelled, closing consumer", "")
+			c.Close()
+		case <-done:
+			return
+		}
+	}()
+
 	return c.ownConsumer.Run(handler)
 }
 
 func (c *consumer) Close() {
-	if c.ownConsumer != nil {
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		c.ownConsumer.CloseWithContext(shutdownCtx)
-	}
+	c.closeOnce.Do(func() {
+		if c.ownConsumer != nil {
+			shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
 
-	c.logger.Info("Consumer closed", "", zap.String("exchange", string(c.exchange)), zap.String("queue", c.queueName))
+			c.ownConsumer.CloseWithContext(shutdownCtx)
+		}
+
+		c.logger.Info(
+			"Consumer closed",
+			"",
+			zap.String("exchange", string(c.exchange)),
+			zap.String("queue", c.queueName),
+		)
+	})
 }
