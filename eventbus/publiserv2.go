@@ -188,3 +188,41 @@ func (p *publisherV2) SafetyPublish(
 
 	return fmt.Errorf("message failed after %d retries and was sent to DLQ", *p.maxRetries)
 }
+
+func NewPublisherV2(
+	connector *RabbitMQConnector,
+	exchange ExchangeName,
+	exchangeType ExchangeType,
+	maxRetries *int,
+	retryDelay *int,
+	isConfirmedMode bool,
+	logger log.LoggerV2,
+) PublisherV2 {
+	options := []func(*rabbitmq.PublisherOptions){
+		rabbitmq.WithPublisherOptionsExchangeDeclare,
+		rabbitmq.WithPublisherOptionsExchangeName(string(exchange)),
+		rabbitmq.WithPublisherOptionsExchangeKind(string(exchangeType)),
+		rabbitmq.WithPublisherOptionsExchangeDurable,
+	}
+
+	if isConfirmedMode {
+		options = append(options, rabbitmq.WithPublisherOptionsConfirm)
+	}
+
+	publisherInstance, err := rabbitmq.NewPublisher(
+		connector.conn,
+		options...,
+	)
+
+	if err != nil {
+		panic(fmt.Sprintf("Failed to create publisher: %v", err))
+	}
+
+	return &publisherV2{
+		exchange:   exchange,
+		logger:     logger,
+		maxRetries: maxRetries,
+		retryDelay: retryDelay,
+		publisher:  publisherInstance,
+	}
+}
