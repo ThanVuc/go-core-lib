@@ -32,3 +32,15 @@ type GeneratedURLResponse struct {
 	PublicURL    string `json:"public_url"`
 	ObjectKey    string `json:"object_key"`
 }
+
+type UploadFileOptions struct {
+	KeyPrefix string
+	MaxSizeMB int
+}
+
+type UploadFileResult struct {
+	FileName  string `json:"file_name"`
+	ObjectKey string `json:"object_key"`
+	PublicURL string `json:"public_url"`
+	Error     string `json:"error,omitempty"`
+}

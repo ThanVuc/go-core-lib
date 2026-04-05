@@ -7,6 +7,7 @@ import (
 	"mime"
 	"mime/multipart"
 	"net/url"
+	"path/filepath"
 	"strings"
 
 	"github.com/google/uuid"
@@ -163,4 +164,137 @@ func (c *R2Client) DeleteMany(ctx context.Context, keys []string) error {
 		return fmt.Errorf("delete many failed: %v", strings.Join(failed, "; "))
 	}
 	return nil
+}
+
+func (c *R2Client) UploadFiles(
+	ctx context.Context,
+	files []*multipart.FileHeader,
+	opts UploadFileOptions,
+) ([]UploadFileResult, error) {
+
+	if len(files) == 0 {
+		return nil, nil
+	}
+
+	results := make([]UploadFileResult, len(files))
+
+	// limit concurrent (tránh spam goroutine)
+	sem := make(chan struct{}, 5) // max 5 concurrent
+	done := make(chan struct{})
+
+	for i, file := range files {
+		i := i
+		file := file
+
+		go func() {
+			sem <- struct{}{}
+			defer func() {
+				<-sem
+				done <- struct{}{}
+			}()
+
+			result := UploadFileResult{
+				FileName: file.Filename,
+			}
+
+			// check size
+			if opts.MaxSizeMB > 0 && file.Size > int64(opts.MaxSizeMB)*1024*1024 {
+				result.Error = fmt.Sprintf("file too large (max %dMB)", opts.MaxSizeMB)
+				results[i] = result
+				return
+			}
+
+			src, err := file.Open()
+			if err != nil {
+				result.Error = err.Error()
+				results[i] = result
+				return
+			}
+			defer src.Close()
+
+			// detect content type
+			contentType := file.Header.Get("Content-Type")
+			if contentType == "" {
+				contentType = "application/octet-stream"
+			}
+
+			// lấy extension
+			ext := filepath.Ext(file.Filename)
+			if ext == "" {
+				exts, _ := mime.ExtensionsByType(contentType)
+				if len(exts) > 0 {
+					ext = exts[0]
+				}
+			}
+
+			// generate key
+			key := fmt.Sprintf("%s/%s%s",
+				strings.TrimSuffix(opts.KeyPrefix, "/"),
+				uuid.NewString(),
+				ext,
+			)
+
+			// upload trực tiếp (stream)
+			_, err = c.mc.PutObject(ctx, c.cfg.Bucket, key, src, file.Size, minio.PutObjectOptions{
+				ContentType: contentType,
+			})
+			if err != nil {
+				result.Error = err.Error()
+				results[i] = result
+				return
+			}
+
+			publicURL, err := c.GetPublicURL(key)
+			if err != nil {
+				result.Error = err.Error()
+				results[i] = result
+				return
+			}
+
+			result.ObjectKey = key
+			result.PublicURL = publicURL
+			results[i] = result
+		}()
+	}
+
+	// wait all
+	for range files {
+		<-done
+	}
+
+	return results, nil
+}
+
+func (c *R2Client) ReplaceFile(ctx context.Context, oldURL string, file *multipart.FileHeader, prefix string) (string, error) {
+	// new upload
+	results, err := c.UploadFiles(ctx, []*multipart.FileHeader{file}, UploadFileOptions{
+		KeyPrefix: prefix,
+		MaxSizeMB: 10, // optional limit
+	})
+	if err != nil {
+		return "", err
+	}
+
+	newURL := results[0].PublicURL
+
+	// delete old file if oldURL provided
+	if oldURL != "" {
+		_ = c.Delete(ctx, oldURL) // ignore error optional
+	}
+
+	return newURL, nil
+}
+
+
+// GenerateMultiplePresignedURLs
+func (c *R2Client) GenerateMultiplePresignedURLs(ctx context.Context, otps []PresignOptions) ([]GeneratedURLResponse, error) {
+	responses := make([]GeneratedURLResponse, len(otps))
+	for i, otp := range otps {
+		resp, err := c.GeneratePresignedURL(ctx, otp)
+		if err != nil {
+			return nil, fmt.Errorf("failed to generate presigned URL for index %d: %w", i, err)
+		}
+		responses[i] = *resp
+	}
+	return responses, nil
 }
