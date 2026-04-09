@@ -25,6 +25,7 @@ type PresignOptions struct {
 	ContentType string
 	Expiry      time.Duration
 	ObjectKey   *string
+	FileName    string
 }
 
 type GeneratedURLResponse struct {

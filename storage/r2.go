@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/minio/minio-go/v7"
@@ -35,19 +36,29 @@ func NewClient(cfg Config) (*R2Client, error) {
 	return &R2Client{mc: mc, cfg: cfg}, nil
 }
 
-// Generate a presigned URL for uploading or updating a new object.
 func (c *R2Client) GeneratePresignedURL(ctx context.Context, otps PresignOptions) (*GeneratedURLResponse, error) {
-	exts, err := mime.ExtensionsByType(otps.ContentType)
-	if err != nil || len(exts) == 0 {
-		return nil, fmt.Errorf("invalid or unknown content type: %s", otps.ContentType)
-	}
-	ext := exts[0]
-
 	var key string
 	if otps.ObjectKey != nil {
 		key = *otps.ObjectKey
 	} else {
-		key = fmt.Sprintf("%s/%s%s", strings.TrimSuffix(otps.KeyPrefix, "/"), uuid.NewString(), ext)
+		fileName := c.sanitizeFileName(otps.FileName)
+		ext := filepath.Ext(fileName)
+
+		if ext == "" {
+			ext = c.getExtension(otps.ContentType)
+		}
+
+		name := strings.TrimSuffix(fileName, ext)
+
+		timestamp := time.Now().UnixMilli()
+
+		newFileName := fmt.Sprintf("%s-%d%s", name, timestamp, ext)
+
+		key = fmt.Sprintf(
+			"%s/%s",
+			strings.TrimSuffix(otps.KeyPrefix, "/"),
+			newFileName,
+		)
 	}
 
 	reqParams := make(url.Values)
@@ -68,6 +79,36 @@ func (c *R2Client) GeneratePresignedURL(ctx context.Context, otps PresignOptions
 		PublicURL:    publicURL,
 		ObjectKey:    key,
 	}, nil
+}
+
+func (c *R2Client) getExtension(contentType string) string {
+	exts, err := mime.ExtensionsByType(contentType)
+	if err == nil && len(exts) > 0 {
+		return exts[0]
+	}
+
+	switch contentType {
+	case "text/markdown", "text/x-markdown":
+		return ".md"
+	case "text/plain":
+		return ".txt"
+	case "text/csv":
+		return ".csv"
+	case "application/json":
+		return ".json"
+	case "image/webp":
+		return ".webp"
+	default:
+		return ".bin"
+	}
+}
+
+func (c *R2Client) sanitizeFileName(name string) string {
+	name = filepath.Base(name)
+	name = strings.ReplaceAll(name, " ", "_")
+	name = strings.ReplaceAll(name, "..", "")
+	name = strings.ReplaceAll(name, ";", "_")
+	return name
 }
 
 // If uploading the image with the existing key, it may overwrite the existing file.(Update)
@@ -284,7 +325,6 @@ func (c *R2Client) ReplaceFile(ctx context.Context, oldURL string, file *multipa
 
 	return newURL, nil
 }
-
 
 // GenerateMultiplePresignedURLs
 func (c *R2Client) GenerateMultiplePresignedURLs(ctx context.Context, otps []PresignOptions) ([]GeneratedURLResponse, error) {
